@@ -371,6 +371,26 @@ main#grid{padding:10px 12px 120px}
 .sync-btns button:disabled{opacity:.55}
 .sync-tip{margin:10px 0 0;font-size:11px;line-height:1.7;color:var(--ink3)}
 .sync-tip b{color:var(--ink2)}
+.sync-tabs{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:13px;
+  background:var(--panel2);border:1px solid var(--line2)}
+.sync-tabs button{
+  padding:9px 6px;border-radius:10px;font-weight:800;font-size:12.5px;letter-spacing:-.2px;
+  background:transparent;border:0;color:var(--ink3);transition:color .16s,background .16s,box-shadow .16s;
+}
+.sync-tabs button[aria-selected="true"]{
+  color:var(--ink);background:linear-gradient(150deg,rgba(185,161,255,.30),rgba(185,161,255,.10));
+  box-shadow:inset 0 0 0 1px rgba(185,161,255,.34);
+}
+.sync-tabs button:active{transform:scale(.98)}
+.sync-pane{display:grid;gap:8px}
+.sync-btnrow{display:grid;gap:8px;margin-top:2px}
+.sync-btnrow button{
+  padding:11px;border-radius:12px;font-weight:800;font-size:13px;
+  background:linear-gradient(150deg,#b9a1ff,#8f74e0);color:#191423;border:1px solid transparent;
+}
+.sync-btnrow button:active{transform:scale(.98)}
+.sync-btnrow button:disabled{opacity:.55}
+.sync-warn{margin:-2px 0 0;font-size:11px;font-weight:800;line-height:1.5;color:#f0a6a2}
 .sync-mail{margin:0 0 10px;font-size:12.5px;color:var(--ink2);word-break:break-all}
 .sync-mail b{color:var(--ink)}
 .sync-close{
@@ -498,13 +518,28 @@ main#grid{padding:10px 12px 120px}
     <h3 id="syncTitle">☁️ 로그인 / 동기화</h3>
     <p class="sync-state" id="syncState">로그인하면 보유 포카를 체크하고 내 계정에 저장할 수 있어요. 체크한 목록은 다른 기기에서도 그대로 이어지고, 도감 열람·검색·필터는 로그인 없이도 쓸 수 있어요.</p>
     <div class="sync-form hidden" id="syncForm">
-      <input id="authEmail" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="이메일">
-      <input id="authPass" type="password" autocomplete="current-password" placeholder="비밀번호 (6자 이상)">
-      <div class="sync-btns">
-        <button class="primary" id="btnSignIn">로그인</button>
-        <button id="btnSignUp">회원가입</button>
+      <div class="sync-tabs" role="tablist" aria-label="로그인 또는 회원가입">
+        <button type="button" role="tab" id="tabSignIn" aria-selected="true" aria-controls="paneSignIn">로그인</button>
+        <button type="button" role="tab" id="tabSignUp" aria-selected="false" aria-controls="paneSignUp">회원가입</button>
       </div>
-      <p class="sync-tip">처음이면 <b>회원가입</b>으로 계정을 만들고, 가입 확인 메일의 링크를 누른 뒤 로그인해 주세요. 입력한 비밀번호는 이 브라우저의 로그인 세션에만 쓰이고 파일에는 저장되지 않아요.</p>
+      <div class="sync-pane" id="paneSignIn" role="tabpanel" aria-labelledby="tabSignIn">
+        <input id="authEmail" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="이메일">
+        <input id="authPass" type="password" autocomplete="current-password" placeholder="비밀번호">
+        <div class="sync-btnrow">
+          <button id="btnSignIn">로그인</button>
+        </div>
+        <p class="sync-tip">계정이 없으신가요? 위 <b>회원가입</b> 탭에서 바로 만들 수 있어요.</p>
+      </div>
+      <div class="sync-pane hidden" id="paneSignUp" role="tabpanel" aria-labelledby="tabSignUp">
+        <input id="authEmail2" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="이메일">
+        <input id="authPass2" type="password" autocomplete="new-password" placeholder="비밀번호 (6자 이상)">
+        <input id="authPass3" type="password" autocomplete="new-password" placeholder="비밀번호 확인">
+        <p class="sync-warn hidden" id="pwMismatch">비밀번호가 서로 달라요. 두 칸을 똑같이 입력해 주세요.</p>
+        <div class="sync-btnrow">
+          <button id="btnSignUp">회원가입</button>
+        </div>
+        <p class="sync-tip">이메일 인증 없이 입력 즉시 <b>가입·로그인</b>됩니다. 보유 포카는 계정에 자동 저장돼요.</p>
+      </div>
     </div>
     <div class="sync-user hidden" id="syncUser">
       <p class="sync-mail" id="syncEmail"></p>
@@ -1159,6 +1194,7 @@ function bind(){
 /* 보유 목록의 기준은 로그인한 계정(user_collections)이고, 같은 목록을 기기 localStorage 에도 사본으로 남겨
    새로고침 직후에도 바로 보인다. 로그인 전에는 체크 자체가 막힌다. */
 let _sb=null, _user=null, _cloudTimer=null, _pushBusy=false, _noPush=false;
+let _authTab='in', _lastUid=null, _pullBusy=null;
 
 function supabaseReady(){ return !/YOUR_SUPABASE/.test(SUPABASE_ANON_KEY) && /^https?:\/\//.test(SUPABASE_URL); }
 function sbClient(){
@@ -1182,7 +1218,7 @@ function syncErrText(e){
   if(/does not exist|42P01|schema cache/i.test(m)) return '아직 user_collections 테이블이 없어요. Supabase SQL 편집기에서 테이블을 먼저 만들어 주세요.';
   if(/row-level security|42501|permission denied/i.test(m)) return 'RLS 정책에 막혔어요. user_collections 에서 본인 행만 읽고 쓸 수 있는 정책을 넣어 주세요.';
   if(/Invalid API key|No API key|401|jwt/i.test(m)) return 'anon key 가 올바르지 않아요. 파일 위쪽 SUPABASE_ANON_KEY 값을 확인해 주세요.';
-  if(/Email not confirmed/i.test(m)) return '메일 인증이 아직 안 끝났어요. 가입 확인 메일의 링크를 먼저 눌러 주세요.';
+  if(/Email not confirmed/i.test(m)) return '이 계정은 아직 이메일 인증이 필요해요. 메일함의 확인 링크를 누른 뒤 다시 로그인해 주세요.';
   if(/Invalid login credentials/i.test(m)) return '이메일이나 비밀번호가 맞지 않아요.';
   if(/already registered/i.test(m)) return '이미 가입된 이메일이에요. 회원가입 대신 로그인해 주세요.';
   if(/Password should be at least|password.*6/i.test(m)) return '비밀번호는 6자 이상이어야 해요.';
@@ -1209,25 +1245,67 @@ function renderSyncUI(){
     syncNote(why, '');
   }
 }
+/* 로그인 / 회원가입 탭 — 모달을 열 때·닫을 때·로그아웃 뒤에는 항상 '로그인' 탭으로 돌아온다 */
+function showPwMismatch(on){
+  const el=$('#pwMismatch'); if(!el) return;
+  el.classList.toggle('hidden', !on);
+}
+function setAuthTab(tab){
+  _authTab = (tab==='up') ? 'up' : 'in';
+  const isIn = _authTab==='in';
+  const tIn=$('#tabSignIn'), tUp=$('#tabSignUp');
+  if(tIn) tIn.setAttribute('aria-selected', isIn ? 'true' : 'false');
+  if(tUp) tUp.setAttribute('aria-selected', isIn ? 'false' : 'true');
+  if($('#paneSignIn')) $('#paneSignIn').classList.toggle('hidden', !isIn);
+  if($('#paneSignUp')) $('#paneSignUp').classList.toggle('hidden', isIn);
+  showPwMismatch(false);
+}
+function switchAuthTab(tab){
+  if(tab === _authTab) return;
+  // 탭을 옮겨도 입력하던 이메일은 그대로 이어지게
+  const from = _authTab==='in' ? $('#authEmail') : $('#authEmail2');
+  const to   = tab==='in' ? $('#authEmail') : $('#authEmail2');
+  if(from && to && from.value) to.value = from.value;
+  setAuthTab(tab);
+  const focusEl = tab==='in' ? $('#authPass') : $('#authPass2');
+  setTimeout(()=>{ try{ (to && to.value ? focusEl : to).focus(); }catch(e){} }, 30);
+}
+function resetAuthForm(){
+  setAuthTab('in');
+  ['#authPass','#authPass2','#authPass3'].forEach(sel=>{ const el=$(sel); if(el) el.value=''; });
+  showPwMismatch(false);
+}
+function authEls(tab){
+  return tab==='up'
+    ? { email:$('#authEmail2'), pass:$('#authPass2'), pass2:$('#authPass3') }
+    : { email:$('#authEmail'),  pass:$('#authPass'),  pass2:null };
+}
 function openSync(){
   const m=$('#syncModal'); if(!m) return;
+  resetAuthForm();
   renderSyncUI();
   if(!_user && supabaseReady() && sbClient()){
     if($('#syncState') && !$('#syncState').dataset.busy) syncNote('로그인하면 보유 포카를 체크하고 내 계정에 저장할 수 있어요. 체크한 목록은 다른 기기에서도 그대로 이어지고, 도감 열람·검색·필터는 로그인 없이도 쓸 수 있어요.');
   }
   m.classList.remove('hidden');
   m.onclick = e=>{ if(e.target===m) closeSync(); };
-  setTimeout(()=>{ if(!$('#syncForm').classList.contains('hidden')) { try{ $('#authEmail').focus(); }catch(e){} } }, 60);
+  setTimeout(()=>{ if(!$('#syncForm').classList.contains('hidden')) { try{ authEls(_authTab).email.focus(); }catch(e){} } }, 60);
 }
-function closeSync(){ const m=$('#syncModal'); if(m) m.classList.add('hidden'); }
+function closeSync(){ resetAuthForm(); const m=$('#syncModal'); if(m) m.classList.add('hidden'); }
 
 /* 로그인 세션 → 보유 목록 합집합 병합 → 클라우드에 저장 */
 async function onSession(session){
   if(session && session.user){
+    const uid = session.user.id;
+    // doAuth 직후 onAuthStateChange 가 같은 세션으로 또 불러도 요청이 두 번 나가지 않게 한다
+    const same = !!(_user && _user.id===uid && _lastUid===uid);
     _user = session.user;
     renderSyncUI();
+    if(same) return;
+    _lastUid = uid;
     await cloudPull();
   } else {
+    _lastUid = null;
     _user = null;
     renderSyncUI();
   }
@@ -1239,6 +1317,12 @@ function queueCloudSave(){
   _cloudTimer = setTimeout(()=>{ cloudPush(true); }, 900);
 }
 async function cloudPull(){
+  const c=sbClient(); if(!c || !_user) return;
+  if(_pullBusy) return _pullBusy;   // 이미 불러오는 중이면 그 요청에 그대로 붙는다
+  _pullBusy = pullOnce();
+  try{ await _pullBusy; } finally { _pullBusy = null; }
+}
+async function pullOnce(){
   const c=sbClient(); if(!c || !_user) return;
   syncNote('☁️ 계정의 보유 목록을 불러오는 중…');
   try{
@@ -1280,19 +1364,32 @@ async function cloudPush(silent){
 async function doAuth(kind){
   const c=sbClient();
   if(!c){ renderSyncUI(); return; }
-  const emailEl=$('#authEmail'), passEl=$('#authPass');
+  const tab = (kind==='up') ? 'up' : 'in';
+  setAuthTab(tab);
+  const els = authEls(tab);
+  const emailEl=els.email, passEl=els.pass, pass2El=els.pass2;
   const email=(emailEl && emailEl.value||'').trim();
   const pass=(passEl && passEl.value||'');
   if(!email || email.indexOf('@')<0){ toast('이메일을 정확히 입력해 주세요'); try{emailEl.focus();}catch(e){} return; }
   if(pass.length<6){ toast('비밀번호는 6자 이상이에요'); try{passEl.focus();}catch(e){} return; }
-  const buttons=[$('#btnSignIn'),$('#btnSignUp')].filter(Boolean);
+  if(tab==='up'){
+    const pass2=(pass2El && pass2El.value||'');
+    if(pass2 !== pass){
+      showPwMismatch(true);
+      toast('비밀번호 확인이 서로 달라요');
+      try{ pass2El.focus(); }catch(e){}
+      return;
+    }
+    showPwMismatch(false);
+  }
+  const buttons=[tab==='up' ? $('#btnSignUp') : $('#btnSignIn')].filter(Boolean);
   buttons.forEach(b=>b.disabled=true);
   try{
-    if(kind==='in'){
+    if(tab==='in'){
       syncNote('☁️ 로그인하는 중…');
       const { data, error } = await c.auth.signInWithPassword({ email, password: pass });
       if(error) throw error;
-      if($('#authPass')) $('#authPass').value='';
+      if(passEl) passEl.value='';
       await onSession(data && data.session ? data.session : null);
       toast('로그인했어요 · 계정과 보유 목록을 맞추는 중');
     } else {
@@ -1300,11 +1397,12 @@ async function doAuth(kind){
       const { data, error } = await c.auth.signUp({ email, password: pass });
       if(error) throw error;
       if(data && data.session){
-        if($('#authPass')) $('#authPass').value='';
+        if(passEl) passEl.value='';
+        if(pass2El) pass2El.value='';
         await onSession(data.session);
         toast('가입하고 로그인했어요');
       } else {
-        syncNote('✉️ 가입 확인 메일을 보냈어요. 메일함에서 인증 링크를 누른 뒤 <b>로그인</b>해 주세요.', 'ok');
+        syncNote('✉️ 계정은 만들어졌지만 인증 메일 확인이 필요한 상태예요. Supabase 에서 Confirm email 을 끄면 입력 즉시 로그인됩니다.', 'warn');
       }
     }
   }catch(e){
@@ -1313,7 +1411,7 @@ async function doAuth(kind){
   }finally{
     buttons.forEach(b=>b.disabled=false);
     renderSyncUI();
-    if(kind==='in' && _user && $('#syncModal') && !$('#syncModal').classList.contains('hidden')){
+    if(tab==='in' && _user && $('#syncModal') && !$('#syncModal').classList.contains('hidden')){
       const st=$('#syncState');
       if(st && !st.innerHTML.trim()) syncNote('☁️ 로그인됐어요.');
     }
@@ -1324,7 +1422,8 @@ async function signOutNow(){
   try{
     await c.auth.signOut();
   }catch(e){ console.warn('[sync] 로그아웃 실패', e); }
-  _user=null; _noPush=false;
+  _user=null; _noPush=false; _lastUid=null;
+  resetAuthForm();
   renderSyncUI();
   syncNote('로그아웃했어요. 다시 로그인하면 계정에 저장된 목록을 이어서 볼 수 있어요.');
   toast('로그아웃했어요');
@@ -1336,21 +1435,29 @@ function initSync(){
     showModal({
       title:'ℹ️ 안내',
       body:'비영리 팬 메이드 아카이브 · 모든 이미지의 권리는 원권리자(더뮤즈엔터테인먼트 등)에 있으며 권리자 요청 시 즉시 삭제합니다.<br><br>'
-          +'개인 소장 정리용이고, 보유 체크는 로그인한 내 계정에 저장돼 다른 기기에서도 이어집니다(로그인 전에는 체크할 수 없어요). 내 사진은 기기 밖으로 전송되지 않아요.',
+          +'개인 소장 정리용이고, 보유 체크는 로그인한 내 계정에 저장돼 다른 기기에서도 이어집니다(로그인 전에는 체크할 수 없어요). 회원가입은 이메일 인증 없이 바로 되고, 내 사진은 기기 밖으로 전송되지 않아요.',
       buttons:[{label:'확인', primary:true}]
     });
   };
   if($('#syncClose')) $('#syncClose').onclick=closeSync;
+  if($('#tabSignIn')) $('#tabSignIn').onclick=()=>switchAuthTab('in');
+  if($('#tabSignUp')) $('#tabSignUp').onclick=()=>switchAuthTab('up');
   if($('#btnSignIn')) $('#btnSignIn').onclick=()=>doAuth('in');
   if($('#btnSignUp')) $('#btnSignUp').onclick=()=>doAuth('up');
+  ['#authPass2','#authPass3'].forEach(sel=>{
+    const el=$(sel); if(el) el.addEventListener('input', ()=>showPwMismatch(false));
+  });
   if($('#btnSignOut')) $('#btnSignOut').onclick=signOutNow;
   if($('#btnSyncNow')) $('#btnSyncNow').onclick=async()=>{
     if(!cloudUser()) return;
     await cloudPull();
     toast('계정과 동기화했어요');
   };
-  if($('#authPass')) $('#authPass').addEventListener('keydown', e=>{
-    if(e.key==='Enter'){ e.preventDefault(); doAuth('in'); }
+  [['#authEmail','in'],['#authPass','in'],['#authEmail2','up'],['#authPass2','up'],['#authPass3','up']].forEach(([sel,kind])=>{
+    const el=$(sel); if(!el) return;
+    el.addEventListener('keydown', e=>{
+      if(e.key==='Enter'){ e.preventDefault(); doAuth(kind); }
+    });
   });
   renderSyncUI();
   const c=sbClient();
