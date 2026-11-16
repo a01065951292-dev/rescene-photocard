@@ -58,15 +58,13 @@ h1{font-size:16px;margin:0;letter-spacing:-.2px;white-space:nowrap}
 .hd-btn:active{transform:scale(.97)}
 .hd-btn.on{background:linear-gradient(150deg,#b9a1ff,#8f74e0);color:#1a1526;border-color:transparent}
 
-.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:9px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:9px}
 .stat{
   background:var(--panel);border:1px solid var(--line);border-radius:12px;
   padding:6px 4px 5px;text-align:center;min-width:0;
 }
 .stat b{display:block;font-size:16px;letter-spacing:-.4px;font-variant-numeric:tabular-nums;line-height:1.15}
 .stat span{display:block;font-size:9.5px;color:var(--ink3);letter-spacing:.02em;white-space:nowrap}
-.stat.minami{border-color:rgba(238,192,106,.42);background:linear-gradient(160deg,rgba(238,192,106,.14),rgba(238,192,106,.02))}
-.stat.minami b{color:var(--gold)}
 .bar{height:5px;border-radius:99px;background:#241f33;margin-top:8px;overflow:hidden}
 .bar i{display:block;height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,#b9a1ff,#f286a8,#eec06a);transition:width .35s ease}
 
@@ -402,7 +400,6 @@ main#grid{padding:10px 12px 120px}
     <div class="stat"><b id="stOwned">0</b><span>보유</span></div>
     <div class="stat"><b id="stTotal">0</b><span>전체 카드</span></div>
     <div class="stat"><b id="stPct">0%</b><span>달성률</span></div>
-    <div class="stat minami"><b id="stMinami">0/0</b><span>미나미 달성</span></div>
   </div>
   <div class="bar"><i id="barAll"></i></div>
 </header>
@@ -437,7 +434,6 @@ main#grid{padding:10px 12px 120px}
   <div class="toolrow">
     <button class="mini-btn" id="btnExport">⬇ 내보내기</button>
     <button class="mini-btn" id="btnImport">⬆ 불러오기</button>
-    <button class="mini-btn" id="btnMinami">🔥 미나미만</button>
     <button class="mini-btn" id="btnReset">✕ 보유 초기화</button>
   </div>
 </div>
@@ -753,12 +749,10 @@ function zoneHead(z, list){
 /* ================= 통계 ================= */
 function stats(){
   const total = CARDS.length, own = CARDS.filter(c=>state.owned.has(c.id)).length;
-  const mm = CARDS.filter(c=>c.member==='미나미'), mmOwn = mm.filter(c=>state.owned.has(c.id)).length;
   $('#stOwned').textContent = own;
   $('#stTotal').textContent = total;
   const pct = total? (own/total*100):0;
   $('#stPct').textContent = (pct>=10? pct.toFixed(0): pct.toFixed(1)) + '%';
-  $('#stMinami').textContent = mmOwn + '/' + mm.length;
   $('#barAll').style.width = pct.toFixed(1) + '%';
 }
 
@@ -1107,7 +1101,6 @@ function bind(){
   $('#setSel').onchange=e=>{ state.set=e.target.value; zonebar(); render(); };
   $('#statusSel').onchange=e=>{ state.status=e.target.value; render(); };
   $('#sortSel').onchange=e=>{ state.sort=e.target.value; render(); };
-  $('#btnMinami').onclick=()=>{ state.member='미나미'; tabs(); render(); window.scrollTo({top:0,behavior:'smooth'}); toast('미나미 카드만 보고 있어요'); };
   $('#btnExport').onclick=doExport;
   $('#btnImport').onclick=()=>$('#fileJson').click();
   $('#fileJson').onchange=e=>{ doImport(e.target.files[0]); e.target.value=''; };
