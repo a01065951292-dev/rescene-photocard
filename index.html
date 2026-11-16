@@ -514,7 +514,7 @@ main#grid{padding:10px 12px 120px}
       </div>
     </div>
     <p class="sync-tip hidden" id="syncSetup">
-      지금은 <b>이 기기에만</b> 저장돼요. 계정 동기화를 켜려면 HTML 파일 맨 위 스크립트의
+      지금은 <b>로그인·계정 동기화가 꺼져 있어요</b>. 켜려면 HTML 파일 맨 위 스크립트의
       <b>SUPABASE_URL</b> · <b>SUPABASE_ANON_KEY</b> 값을 본인 Supabase 프로젝트 값으로 바꿔 주세요.
       지금은 보유 체크(로그인)를 쓸 수 없고 도감 열람·검색만 됩니다.
     </p>
@@ -1156,8 +1156,8 @@ function bind(){
 }
 
 /* ================= ☁️ 로그인 / 동기화 ================= */
-/* 로그인하지 않아도 되는 구조: 체크는 늘 localStorage(KEY)에 먼저 저장되고,
-   로그인했을 때만 같은 목록을 user_collections 테이블과 합집합으로 맞춘다. */
+/* 보유 목록의 기준은 로그인한 계정(user_collections)이고, 같은 목록을 기기 localStorage 에도 사본으로 남겨
+   새로고침 직후에도 바로 보인다. 로그인 전에는 체크 자체가 막힌다. */
 let _sb=null, _user=null, _cloudTimer=null, _pushBusy=false, _noPush=false;
 
 function supabaseReady(){ return !/YOUR_SUPABASE/.test(SUPABASE_ANON_KEY) && /^https?:\/\//.test(SUPABASE_URL); }
@@ -1204,8 +1204,8 @@ function renderSyncUI(){
   }
   if(!conf){
     const why = supabaseReady()
-      ? 'Supabase 라이브러리를 불러오지 못했어요(오프라인이거나 차단된 경우). 지금은 <b>이 기기에만</b> 저장됩니다.'
-      : '지금은 <b>이 기기에만</b> 저장돼요.';
+      ? 'Supabase 라이브러리를 불러오지 못했어요(오프라인이거나 차단된 경우). 지금은 <b>로그인·보유 체크를 쓸 수 없고</b> 도감 열람·검색만 됩니다.'
+      : '지금은 <b>로그인·보유 체크를 쓸 수 없고</b> 도감 열람·검색만 됩니다.';
     syncNote(why, '');
   }
 }
@@ -1213,7 +1213,7 @@ function openSync(){
   const m=$('#syncModal'); if(!m) return;
   renderSyncUI();
   if(!_user && supabaseReady() && sbClient()){
-    if($('#syncState') && !$('#syncState').dataset.busy) syncNote('계정에 보유 목록을 저장해 두면 다른 기기에서도 이어서 볼 수 있어요. 로그인하지 않아도 도감은 그대로 쓸 수 있어요.');
+    if($('#syncState') && !$('#syncState').dataset.busy) syncNote('로그인하면 보유 포카를 체크하고 내 계정에 저장할 수 있어요. 체크한 목록은 다른 기기에서도 그대로 이어지고, 도감 열람·검색·필터는 로그인 없이도 쓸 수 있어요.');
   }
   m.classList.remove('hidden');
   m.onclick = e=>{ if(e.target===m) closeSync(); };
@@ -1326,7 +1326,7 @@ async function signOutNow(){
   }catch(e){ console.warn('[sync] 로그아웃 실패', e); }
   _user=null; _noPush=false;
   renderSyncUI();
-  syncNote('로그아웃했어요. 보유 체크는 이 기기에 그대로 남아 있어요.');
+  syncNote('로그아웃했어요. 다시 로그인하면 계정에 저장된 목록을 이어서 볼 수 있어요.');
   toast('로그아웃했어요');
 }
 function initSync(){
